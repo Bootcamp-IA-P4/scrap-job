@@ -1,14 +1,15 @@
 import os
 import psycopg2
 from psycopg2 import sql
+from dotenv import load_dotenv
 
+load_dotenv()
 
-DB_NAME = os.getenv("POSTGRES_DB")
-USER = os.getenv("POSTGRES_USER")
-PASSWORD = os.getenv("POSTGRES_PASSWORD")
-HOST = os.getenv("POSTGRES_HOST")
-PORT = os.getenv("POSTGRES_PORT")
-
+DB_NAME = os.getenv("DB_NAME")
+USER = os.getenv("DB_USER")
+PASSWORD = os.getenv("DB_PASSWORD")
+HOST = os.getenv("DB_HOST")
+PORT = os.getenv("DB_PORT")
 
 def create_database():
     try:
@@ -30,7 +31,6 @@ def create_database():
 
     except Exception as e:
         print(f"Error connecting to database: {e}")
-
 
 if __name__ == "__main__":
     create_database()
