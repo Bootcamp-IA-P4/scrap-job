@@ -9,34 +9,55 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-class CompanyNameCleaner:
-    """Cleans and standardizes company names."""
+def clean_company_name(company_name):
+    """
+    Cleans and standardizes the company name by removing special characters, replacing spaces with hyphens,
+    and handling specific abbreviations like 'SAU', 'SLU', etc.
 
-    @staticmethod
-    def clean_company_name(company_name):
-        """
-        Cleans and standardizes the company name.
-        """
-        company_name = company_name.replace(".", "").replace(",", "").replace(" & ", "-").lower().replace(" ", "-")
-        company_name = company_name.replace("ñ", "n")  # Replace 'ñ' with 'n'
-        company_name = re.sub(r'[()]', '', company_name)
-        company_name = re.sub(r'\-sau$', '-sa', company_name)
-        company_name = re.sub(r'\-slu$', '-sl', company_name)
-        company_name = re.sub(r'\-sociedad\-anonima.*$', '-sa', company_name, flags=re.IGNORECASE)
-        company_name = re.sub(r'\-sociedad\-limitada.*$', '-sl', company_name, flags=re.IGNORECASE)
-        return company_name
+    Input:
+        company_name (str): The raw company name to be cleaned.
+
+    Output:
+        str: The cleaned and standardized company name.
+    """
+
+    company_name = company_name.replace(".", "").replace(",", "").replace(" & ", "-").lower().replace(" ", "-")
+    company_name = company_name.replace("ñ", "n")  # Replace 'ñ' with 'n'
+
+    company_name = re.sub(r'[()]', '', company_name)
+
+    company_name = re.sub(r'\-sau$', '-sa', company_name)
+
+    company_name = re.sub(r'\-slu$', '-sl', company_name)
+
+    company_name = re.sub(r'\-sociedad\-anonima.*$', '-sa', company_name, flags=re.IGNORECASE)
+
+    company_name = re.sub(r'\-sociedad\-limitada.*$', '-sl', company_name, flags=re.IGNORECASE)
+
+    return company_name
 
 
-class WebScraper:
-    """Handles web interactions using Selenium."""
+def main():
+    """
+    Main function to scrape company data from the ranking website, extract EBITDA and CIF information,
+    and save the results to a CSV file.
 
-    def __init__(self):
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    Input:
+        None
 
-    def accept_cookies(self):
-        """Accepts cookies on the website."""
+    Output:
+        None (saves the results to 'companies.csv')
+    """
+    try:
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service)
+
+        driver.get("https://ranking-empresas.eleconomista.es/ranking_empresas_nacional.html")
+
+        time.sleep(5)
+
         try:
-            submit_button = WebDriverWait(self.driver, 10).until(
+            submit_button = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "didomi-notice-agree-button"))
             )
             submit_button.click()
@@ -44,14 +65,12 @@ class WebScraper:
         except Exception as e:
             print(f"Error: {e} - Agree button not found or already clicked.")
 
-    def get_company_data(self, url):
-        """Extracts company names and URLs from the ranking table."""
-        self.driver.get(url)
         time.sleep(5)
+
         company_data = []
 
         try:
-            table = self.driver.find_element(By.ID, "tabla-ranking")
+            table = driver.find_element(By.ID, "tabla-ranking")
             rows = table.find_elements(By.TAG_NAME, "tr")
 
             for row in rows:
@@ -71,103 +90,75 @@ class WebScraper:
         except Exception as e:
             print(f"Error while extracting table on page: {e}")
 
-        return company_data
+        df = pd.DataFrame(company_data, columns=["Nombre de la empresa", "Fuente de la información"])
 
-    def extract_ebitda(self, company_url):
-        """Extracts EBITDA data for a given company URL."""
-        self.driver.get(company_url)
-        print(f"Visiting: {company_url}")
-        time.sleep(5)
+        ebitda_data = []
+        cif_data = []
+        cif_urls = []
 
-        try:
-            ebitda_label = self.driver.find_element(By.XPATH, "//td[contains(text(), 'Ebitda 2023')]")
-            ebitda_value = ebitda_label.find_element(By.XPATH, "following-sibling::td").text.strip()
-            ebitda_value_clean = ebitda_value.replace("€", "").replace(".", "").strip()
-            return float(ebitda_value_clean.replace(",", ""))
-        except Exception as e:
-            print(f"Error extracting EBITDA: {e}")
-            return "N/A"
+        for index, row in df.iterrows():
+            company_name = row["Nombre de la empresa"]
+            company_url = row["Fuente de la información"]
 
-    def extract_cif(self, cleaned_name):
-        """Extracts CIF data for a given company name."""
-        self.driver.get(f"https://www.datoscif.es/empresa/{cleaned_name}")
-        print(f"Visiting: https://www.datoscif.es/empresa/{cleaned_name}")
-        time.sleep(5)
+            cleaned_name = clean_company_name(company_name)
 
-        try:
-            tax_id_element = self.driver.find_element(By.CSS_SELECTOR, "span[itemprop='taxID']")
-            return tax_id_element.text
-        except Exception as e:
-            print(f"Error extracting CIF: {e}")
-            return "N/A"
+            driver.get(company_url)
+            print(f"Visiting: {company_url}")
 
-    def close(self):
-        """Closes the Selenium driver."""
-        self.driver.quit()
+            time.sleep(5)
 
+            try:
+                ebitda_label = driver.find_element(
+                    By.XPATH, "//td[contains(text(), 'Ebitda 2023')]"
+                )
+                ebitda_value = ebitda_label.find_element(
+                    By.XPATH, "following-sibling::td"
+                ).text.strip()
 
-class DataSaver:
-    """Saves extracted data to a CSV file."""
+                ebitda_value_clean = ebitda_value.replace("€", "").replace(".", "").strip()
 
-    @staticmethod
-    def save_to_csv(data, filename="companies.csv"):
-        """Saves the DataFrame to a CSV file."""
-        data.to_csv(filename, index=False, encoding="utf-8-sig")
-        print(f"Data saved to {filename}.")
+                ebitda_value_clean = float(ebitda_value_clean.replace(",", ""))
 
-
-class CompanyDataExtractor:
-    """Orchestrates the extraction and processing of company data."""
-
-    def __init__(self):
-        self.scraper = WebScraper()
-        self.cleaner = CompanyNameCleaner()
-        self.saver = DataSaver()
-
-    def run(self):
-        """Main method to execute the extraction process."""
-        try:
-            # Step 1: Extract company names and URLs
-            company_data = self.scraper.get_company_data("https://ranking-empresas.eleconomista.es/ranking_empresas_nacional.html")
-            df = pd.DataFrame(company_data, columns=["Nombre de la empresa", "Fuente de la información"])
-
-            # Step 2: Extract EBITDA and CIF
-            ebitda_data = []
-            cif_data = []
-            cif_urls = []
-
-            for index, row in df.iterrows():
-                company_name = row["Nombre de la empresa"]
-                company_url = row["Fuente de la información"]
-
-                cleaned_name = self.cleaner.clean_company_name(company_name)
-
-                ebitda = self.scraper.extract_ebitda(company_url)
-                ebitda_data.append(ebitda)
+                ebitda_data.append(ebitda_value_clean)
                 cif_urls.append(company_url)
 
-                cif = self.scraper.extract_cif(cleaned_name)
-                cif_data.append(cif)
+            except Exception as e:
+                print(f"Error extracting EBITDA for {company_name}: {e}")
+                ebitda_data.append("N/A")
+                cif_urls.append(company_url)
 
-            # Step 3: Add extracted data to DataFrame
-            df["EBITDA 2023"] = ebitda_data
-            df["CIF"] = cif_data
-            df["Fuente de la información CIF"] = cif_urls
-            df.rename(columns={"Fuente de la información": "Fuente de la información EBITDA"}, inplace=True)
+            driver.get(f"https://www.datoscif.es/empresa/{cleaned_name}")
+            print(f"Visiting: https://www.datoscif.es/empresa/{cleaned_name}")
+            time.sleep(5)
 
-            # Step 4: Filter and save data
-            df = df[["Nombre de la empresa", "Fuente de la información EBITDA", "Fuente de la información CIF", "CIF", "EBITDA 2023"]]
-            df = df[df["EBITDA 2023"].apply(lambda x: isinstance(x, (int, float)) and x > 3000000)]
-            df = df[df["CIF"] != "N/A"]
+            try:
+                tax_id_element = driver.find_element(By.CSS_SELECTOR, "span[itemprop='taxID']")
+                cif_data.append(tax_id_element.text)
+            except Exception as e:
+                print(f"Error extracting CIF for {company_name}: {e}")
+                cif_data.append("N/A")
 
-            self.saver.save_to_csv(df)
+        driver.quit()
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        finally:
-            self.scraper.close()
+        df["EBITDA 2023"] = ebitda_data
+        df["CIF"] = cif_data
+
+        df["Fuente de la información CIF"] = cif_urls
+
+        df.rename(columns={"Fuente de la información": "Fuente de la información EBITDA"}, inplace=True)
+
+        df = df[["Nombre de la empresa", "Fuente de la información EBITDA", "Fuente de la información CIF", "CIF", "EBITDA 2023"]]
+
+        df = df[df["EBITDA 2023"].apply(lambda x: isinstance(x, (int, float)) and x > 3000000)]
+        df = df[df["CIF"] != "N/A"]
+
+        df.to_csv("companies.csv", index=False, encoding="utf-8-sig")
+
+        print("EBITDA extraction complete. The results have been added to 'companies.csv'.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":
-    extractor = CompanyDataExtractor()
-    extractor.run()
+    main()
