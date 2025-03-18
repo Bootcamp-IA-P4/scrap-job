@@ -1,9 +1,7 @@
 import os
-import psycopg2
 import pandas as pd
-from psycopg2 import sql
 from dotenv import load_dotenv
-from connection import connect_to_database
+from db.connection import connect_to_database
 
 load_dotenv()
 
