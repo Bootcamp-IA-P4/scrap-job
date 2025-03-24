@@ -3,9 +3,9 @@ import time
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.support import expected_conditions as EC
 
 
@@ -49,8 +49,8 @@ def main():
         None (saves the results to 'companies.csv')
     """
     try:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service)
+        service = Service(GeckoDriverManager().install())
+        driver = webdriver.Firefox(service=service)
 
         driver.get("https://ranking-empresas.eleconomista.es/ranking_empresas_nacional.html")
 

@@ -1,8 +1,10 @@
+import os
 from . import crud, schemas
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 
