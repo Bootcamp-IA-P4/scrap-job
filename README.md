@@ -32,6 +32,7 @@ A full-stack application for managing company information, including web scrapin
 - pytest (Testing)
 
 ## Project Structure
+```bash
 .
 ├── api/
 │ ├── crud.py
@@ -54,8 +55,7 @@ A full-stack application for managing company information, including web scrapin
 ├── entry_point.sh
 ├── pyproject.toml
 └── poetry.lock
-
-
+```
 ## Installation
 
 ### Prerequisites
